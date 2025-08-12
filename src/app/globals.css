@@ -1,26 +1,159 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
+  /* Dark theme (default) */
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Brand colors */
+    --primary: 59 130 246; /* blue-500 */
+    --secondary: 139 92 246; /* purple-500 */
+    --accent: 6 182 212; /* cyan-500 */
+    --success: 16 185 129; /* green-500 */
+    --warning: 245 158 11; /* yellow-500 */
+    --error: 239 68 68; /* red-500 */
+
+    /* Background colors */
+    --background: 15 15 35; /* #0f0f23 */
+    --surface: 26 26 46; /* #1a1a2e */
+    --surface-2: 37 37 65; /* #252541 */
+
+    /* Text colors */
+    --text-primary: 255 255 255;
+    --text-secondary: 148 163 184;
+    --text-muted: 100 116 139;
+
+    /* Border & Shadow */
+    --border: 51 65 85;
+    --shadow: 0 0 0;
+  }
+
+  /* Light theme */
+  .light {
+    /* Brand colors */
+    --primary: 37 99 235; /* blue-600 */
+    --secondary: 124 58 237; /* purple-600 */
+    --accent: 8 145 178; /* cyan-600 */
+    --success: 5 150 105; /* green-600 */
+    --warning: 217 119 6; /* yellow-600 */
+    --error: 220 38 38; /* red-600 */
+
+    /* Background colors */
+    --background: 255 255 255;
+    --surface: 248 250 252;
+    --surface-2: 241 245 249;
+
+    /* Text colors */
+    --text-primary: 15 23 42;
+    --text-secondary: 71 85 105;
+    --text-muted: 148 163 184;
+
+    /* Border & Shadow */
+    --border: 226 232 240;
+    --shadow: 0 0 0;
+  }
+
+  /* Base styles */
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-text-primary antialiased;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
+  }
+
+  /* Scrollbar styles */
+  ::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-2 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply focus-visible:ring-primary inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary hover:bg-primary/90 text-white;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary hover:bg-secondary/90 text-white;
+  }
+
+  .btn-outline {
+    @apply btn border-border hover:bg-surface border bg-transparent;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-surface hover:text-text-primary;
+  }
+
+  /* Input styles */
+  .input {
+    @apply border-border bg-background ring-offset-background placeholder:text-text-muted focus-visible:ring-primary flex h-10 w-full rounded-md border px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Card styles */
+  .card {
+    @apply border-border bg-surface rounded-lg border shadow-sm;
+  }
+
+  .card-header {
+    @apply flex flex-col space-y-1.5 p-6;
+  }
+
+  .card-content {
+    @apply p-6 pt-0;
+  }
+
+  /* Panel styles */
+  .panel {
+    @apply bg-surface border-border border-l;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities */
+  .animate-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  .animate-out {
+    animation: fadeOut 0.2s ease-in-out;
+  }
+
+  /* Canvas grid background */
+  .canvas-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-surface/80 backdrop-blur-md;
+  }
+
+  /* Text gradient */
+  .text-gradient {
+    @apply from-primary via-secondary to-accent bg-gradient-to-r bg-clip-text text-transparent;
+  }
 }

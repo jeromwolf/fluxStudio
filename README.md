@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Flux Studio
 
-## Getting Started
+A web-based animation studio for creating geometric network animations with
+synchronized audio effects.
 
-First, run the development server:
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation
+
+```bash
+# Clone the repository
+git clone [your-repo-url]
+cd flux-studio
+
+# Install dependencies
+npm install
+```
+
+### Development
+
+Use the provided script to start the development server (handles port conflicts
+automatically):
+
+```bash
+./dev.sh
+```
+
+Or manually:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The application will run on [http://localhost:3456](http://localhost:3456).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Build and start the production server:
 
-## Learn More
+```bash
+./start.sh
+```
 
-To learn more about Next.js, take a look at the following resources:
+Or manually:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Port Management
 
-## Deploy on Vercel
+Check and manage port 3456:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+./port-check.sh
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🛠️ Scripts
+
+- `./dev.sh` - Start development server with auto port management
+- `./start.sh` - Build and start production server
+- `./port-check.sh` - Check and manage port 3456
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run type-check` - Run TypeScript type checking
+
+## 📁 Project Structure
+
+```
+flux-studio/
+├── src/
+│   ├── app/                 # Next.js App Router
+│   │   ├── (dashboard)/     # Dashboard routes
+│   │   │   └── studio/      # Main studio interface
+│   │   └── api/             # API routes
+│   ├── components/          # React components
+│   │   ├── canvas/          # Animation canvas
+│   │   ├── audio/           # Audio components
+│   │   ├── export/          # Export functionality
+│   │   └── ui/              # UI components
+│   ├── lib/                 # Core libraries
+│   │   ├── animation-engine/
+│   │   ├── audio-engine/
+│   │   └── export-system/
+│   └── types/               # TypeScript types
+├── public/                  # Static assets
+└── docs/                    # Documentation
+```
+
+## 🎨 Features
+
+- **Real-time Animation Canvas** - 60fps WebGL-accelerated rendering
+- **Audio Synthesis** - Create and sync sound effects with animations
+- **Multi-format Export** - GIF, MP4, WebM, SVG, Lottie, and more
+- **Timeline Editor** - Precise control over animation and audio timing
+- **Plugin Architecture** - Extensible export format system
+
+## 📖 Documentation
+
+- [Product Requirements Document](./animation-studio-prd.md)
+- [Task Breakdown](./TASK_BREAKDOWN.md)
+- [Claude AI Assistant Guide](./CLAUDE.md)
+
+## 🤝 Contributing
+
+This project is in active development. See TASK_BREAKDOWN.md for current
+development status and roadmap.
+
+## 📄 License
+
+[Your License Here]

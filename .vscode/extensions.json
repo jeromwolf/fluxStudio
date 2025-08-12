@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "prisma.prisma",
+    "ms-vscode.vscode-typescript-next",
+    "streetsidesoftware.code-spell-checker",
+    "streetsidesoftware.code-spell-checker-korean",
+    "mikestead.dotenv",
+    "usernamehw.errorlens",
+    "wix.vscode-import-cost"
+  ]
+}
