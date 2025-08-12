@@ -1,0 +1,43 @@
+{
+  "project": {
+    "name": "Flux Studio",
+    "description": "Web-based animation studio for creating geometric network animations with audio",
+    "repository": "https://github.com/jeromwolf/fluxStudio",
+    "startDate": "2025-08-13",
+    "estimatedDuration": "14-20 weeks"
+  },
+  "settings": {
+    "autoSave": true,
+    "taskIdPrefix": "FLUX",
+    "defaultPriority": "medium",
+    "trackTimeSpent": true,
+    "enableNotifications": false
+  },
+  "team": {
+    "members": [],
+    "roles": {
+      "lead": null,
+      "developers": [],
+      "designers": [],
+      "reviewers": []
+    }
+  },
+  "milestones": [
+    {
+      "id": "mvp",
+      "name": "MVP Release",
+      "targetDate": "2025-10-08",
+      "tasks": ["canvas-foundation", "basic-shapes", "animation-system", "export-infrastructure"]
+    },
+    {
+      "id": "audio-release",
+      "name": "Audio Integration",
+      "targetDate": "2025-10-22",
+      "tasks": ["audio-foundation"]
+    }
+  ],
+  "tags": ["animation", "audio", "export", "ui", "infrastructure", "performance", "testing"],
+  "global": {
+    "defaultTag": "master"
+  }
+}

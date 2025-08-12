@@ -2,21 +2,21 @@
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true,
-    "source.organizeImports": true
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
   },
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "editor.detectIndentation": false,
   "editor.rulers": [100],
-  
+
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
   "files.trimFinalNewlines": true,
-  
+
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  
+
   "tailwindCSS.includeLanguages": {
     "typescript": "javascript",
     "typescriptreact": "javascript"
@@ -25,14 +25,14 @@
     ["clsx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"],
     ["cn\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)"]
   ],
-  
+
   "eslint.validate": [
     "javascript",
     "javascriptreact",
     "typescript",
     "typescriptreact"
   ],
-  
+
   "search.exclude": {
     "**/node_modules": true,
     "**/.next": true,
@@ -42,7 +42,7 @@
     "**/dist": true,
     "**/build": true
   },
-  
+
   "files.exclude": {
     "**/.git": true,
     "**/.svn": true,
@@ -51,7 +51,7 @@
     "**/.DS_Store": true,
     "**/Thumbs.db": true
   },
-  
+
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
