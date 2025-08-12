@@ -1,12 +1,15 @@
 {
-  "name": "flux-studio-new",
+  "name": "flux-studio",
   "version": "0.1.0",
   "private": true,
+  "description": "Web-based animation studio for creating geometric network animations with audio",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "react": "19.1.0",
