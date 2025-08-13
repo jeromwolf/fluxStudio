@@ -269,7 +269,6 @@ export default function AnimationCanvas({
         ref={canvasRef}
         className="block h-full w-full"
         style={{
-          imageRendering: 'pixelated',
           background: theme === 'dark' ? '#0a0a0a' : '#ffffff',
         }}
       />

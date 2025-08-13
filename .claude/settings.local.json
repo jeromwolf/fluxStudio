@@ -17,7 +17,12 @@
       "Bash(npm run build:*)",
       "Bash(grep:*)",
       "Bash(cp:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(npx:*)",
+      "Bash(mv:*)",
+      "Bash(lsof:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
