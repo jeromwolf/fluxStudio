@@ -11,6 +11,8 @@ export interface ExportSettings {
   compression?: number;
   loop?: boolean;
   transparent?: boolean;
+  bitrate?: number;
+  codec?: string;
 }
 
 export interface ExportProgress {

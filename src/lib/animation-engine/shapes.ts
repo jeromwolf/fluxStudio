@@ -220,7 +220,7 @@ export class ShapeRenderer {
     if (!props.nodes || !props.edges) return;
 
     ctx.save();
-    ctx.translate(-shape.position.x, -shape.position.y);
+    // 네트워크는 이미 절대 좌표를 사용하므로 translate 불필요
 
     this.renderNetworkConnections(props, ctx, context);
     this.renderNetworkNodes(props, ctx, context);

@@ -22,7 +22,16 @@
       "Bash(mv:*)",
       "Bash(lsof:*)",
       "Bash(mkdir:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(sed:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(node:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(kill:*)",
+      "Bash(ffprobe:*)",
+      "Bash(open:*)",
+      "WebFetch(domain:devcom.kr)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

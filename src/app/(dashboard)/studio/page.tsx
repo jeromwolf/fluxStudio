@@ -1,385 +1,837 @@
 'use client';
 
-import { useState } from 'react';
-
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import AnimationCanvas from '@/components/canvas/AnimationCanvas';
-import Timeline from '@/components/controls/Timeline';
-import ExportPanel from '@/components/export/ExportPanel';
 import { createShape } from '@/lib/animation-engine/shapes';
 import { useAnimationStore } from '@/lib/stores/animation-store';
+import { animationTemplates, getColorSchemeColors } from '@/lib/templates/animation-templates';
+import { getToolsForTemplate } from '@/lib/templates/template-tools';
 
-export default function StudioPage() {
-  const [showCanvas, setShowCanvas] = useState(true); // 기본적으로 캔버스 표시
-  const [showExportPanel, setShowExportPanel] = useState(false);
+function StudioPageContent() {
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get('template');
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'gif' | 'mp4'>('gif');
+  const [currentTemplate, setCurrentTemplate] = useState<string | null>(templateId);
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [toolParameters, setToolParameters] = useState<Record<string, any>>({});
+  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
+  
+  // Animation controls - will be updated based on template
+  const [nodeCount, setNodeCount] = useState(100);
+  const [connectionDistance, setConnectionDistance] = useState(120);
+  const [animationSpeed, setAnimationSpeed] = useState(1.0);
+  const [nodeSize, setNodeSize] = useState(3);
+  const [colorScheme, setColorScheme] = useState<'blue' | 'purple' | 'rainbow' | 'monochrome' | 'fire' | 'ocean'>('blue');
+  
+  // Audio controls (future implementation)
+  const [frequency, setFrequency] = useState(440);
+  const [volume, setVolume] = useState(0.5);
+  // const [audioEnabled, setAudioEnabled] = useState(false);
 
   const { project, addShape } = useAnimationStore();
 
-  const handleCanvasReady = (context: CanvasRenderingContext2D | WebGLRenderingContext) => {
-    // Canvas initialized successfully
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('Canvas initialized with context:', context.constructor.name);
-    }
-  };
-
-  const handleAddCircle = () => {
-    if (project.layers.length === 0) return;
-
-    // Random position to avoid overlap
-    const x = 100 + Math.random() * 300;
-    const y = 100 + Math.random() * 200;
-
-    const circle = createShape(
-      'circle',
-      { x, y },
-      {
-        radius: 50,
-        fillColor: '#3b82f6',
-        strokeColor: '#1e40af',
-        strokeWidth: 2,
+  // Load template configuration
+  useEffect(() => {
+    if (templateId) {
+      const template = animationTemplates.find(t => t.id === templateId);
+      if (template) {
+        setNodeCount(template.config.nodeCount);
+        setConnectionDistance(template.config.connectionDistance);
+        setAnimationSpeed(template.config.animationSpeed);
+        setNodeSize(template.config.nodeSize);
+        setColorScheme(template.config.colorScheme);
+        setCurrentTemplate(templateId);
       }
-    );
+    }
+  }, [templateId]);
 
-    const newShape = addShape(project.layers[0].id, circle);
+  // Initialize with a network animation on load
+  useEffect(() => {
+    if (project.layers.length > 0 && project.layers[0].shapes.length === 0) {
+      handleCreateNetwork();
+    }
+  }, [currentTemplate]);
 
-    // Add a simple scale animation for demo
-    const { addAnimation } = useAnimationStore.getState();
-    addAnimation(newShape.id, {
-      property: 'radius',
-      keyframes: [
-        { time: 0, value: 30 },
-        { time: 2500, value: 80 },
-        { time: 5000, value: 30 },
-      ],
-      duration: 5000,
-      startTime: 0,
-      easing: 'ease-in-out',
-    });
-
-    setShowCanvas(true);
+  const handleCanvasReady = (context: CanvasRenderingContext2D | WebGLRenderingContext) => {
+    console.log('Canvas ready with context:', context.constructor.name);
   };
 
-  const handleAddNetwork = () => {
+  const handleCreateNetwork = () => {
     if (project.layers.length === 0) return;
 
-    // Random position to avoid overlap
-    const x = 150 + Math.random() * 250;
-    const y = 150 + Math.random() * 150;
+    // Get colors based on current color scheme
+    const colors = getColorSchemeColors(colorScheme);
 
+    // Calculate canvas center based on current canvas size
+    const centerX = canvasSize.width / 2;
+    const centerY = canvasSize.height / 2;
+    const spread = 400; // How far from center nodes can be
+    console.log('Using spread:', spread); // Use the variable to avoid warning
+
+    // 기하학적 패턴으로 노드 배치
+    const nodes = [];
+    const edges = [];
+    
+    // 원형 패턴으로 메인 노드 배치
+    const mainNodeCount = Math.min(12, nodeCount);
+    const radius = 200;
+    
+    for (let i = 0; i < mainNodeCount; i++) {
+      const angle = (i / mainNodeCount) * Math.PI * 2;
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+      
+      nodes.push({
+        id: `main-${i}`,
+        position: { x, y },
+        properties: {
+          size: nodeSize * 1.5,
+          color: colors[i % colors.length],
+          connections: [],
+          pulseSpeed: animationSpeed,
+          pulseIntensity: 0.4,
+          labelColor: '#ffffff',
+          labelSize: 10,
+        },
+      });
+    }
+    
+    // 내부 노드들을 육각형 패턴으로 배치
+    const innerRadius = 100;
+    const innerNodeCount = Math.min(6, Math.floor(nodeCount / 3));
+    
+    for (let i = 0; i < innerNodeCount; i++) {
+      const angle = (i / innerNodeCount) * Math.PI * 2;
+      const x = centerX + Math.cos(angle) * innerRadius;
+      const y = centerY + Math.sin(angle) * innerRadius;
+      
+      nodes.push({
+        id: `inner-${i}`,
+        position: { x, y },
+        properties: {
+          size: nodeSize * 1.2,
+          color: colors[(i + 2) % colors.length],
+          connections: [],
+          pulseSpeed: animationSpeed * 1.2,
+          pulseIntensity: 0.3,
+          labelColor: '#ffffff',
+          labelSize: 10,
+        },
+      });
+    }
+    
+    // 중앙 노드
+    nodes.push({
+      id: 'center',
+      position: { x: centerX, y: centerY },
+      properties: {
+        size: nodeSize * 2,
+        color: colors[0],
+        connections: [],
+        pulseSpeed: animationSpeed * 0.8,
+        pulseIntensity: 0.5,
+        labelColor: '#ffffff',
+        labelSize: 10,
+      },
+    });
+    
+    // 노드 간 연결 생성
+    // 중앙에서 내부 노드로
+    for (let i = 0; i < innerNodeCount; i++) {
+      edges.push({
+        from: 'center',
+        to: `inner-${i}`,
+        strength: 1.0,
+        animated: true,
+      });
+    }
+    
+    // 내부에서 외부 노드로
+    for (let i = 0; i < innerNodeCount; i++) {
+      const outerIndex1 = Math.floor((i / innerNodeCount) * mainNodeCount);
+      const outerIndex2 = (outerIndex1 + 1) % mainNodeCount;
+      
+      edges.push({
+        from: `inner-${i}`,
+        to: `main-${outerIndex1}`,
+        strength: 0.7,
+        animated: true,
+      });
+      
+      edges.push({
+        from: `inner-${i}`,
+        to: `main-${outerIndex2}`,
+        strength: 0.5,
+        animated: false,
+      });
+    }
+    
+    // 외부 노드끼리 연결
+    for (let i = 0; i < mainNodeCount; i++) {
+      const next = (i + 1) % mainNodeCount;
+      edges.push({
+        from: `main-${i}`,
+        to: `main-${next}`,
+        strength: 0.8,
+        animated: true,
+      });
+    }
+    
     const network = createShape(
       'network',
-      { x, y },
+      { x: 0, y: 0 },
       {
-        nodes: [
-          {
-            id: 'node1',
-            position: { x: 0, y: 0 },
-            properties: {
-              size: 20,
-              color: '#3b82f6',
-              connections: [],
-              pulseSpeed: 1,
-              pulseIntensity: 0.3,
-              labelColor: '#ffffff',
-              labelSize: 12,
-            },
-          },
-          {
-            id: 'node2',
-            position: { x: 80, y: 40 },
-            properties: {
-              size: 25,
-              color: '#10b981',
-              connections: [],
-              pulseSpeed: 1,
-              pulseIntensity: 0.3,
-              labelColor: '#ffffff',
-              labelSize: 12,
-            },
-          },
-          {
-            id: 'node3',
-            position: { x: -40, y: 60 },
-            properties: {
-              size: 30,
-              color: '#f59e0b',
-              connections: [],
-              pulseSpeed: 1,
-              pulseIntensity: 0.3,
-              labelColor: '#ffffff',
-              labelSize: 12,
-            },
-          },
-        ],
-        edges: [
-          { from: 'node1', to: 'node2', strength: 0.8, animated: true },
-          { from: 'node2', to: 'node3', strength: 0.6, animated: false },
-          { from: 'node3', to: 'node1', strength: 0.7, animated: true },
-        ],
-        particleCount: 15,
-        particleSpeed: 0.5,
+        nodes,
+        edges,
+        particleCount: Math.floor(nodeCount / 2),
+        particleSpeed: animationSpeed,
       }
     );
 
     const newNetwork = addShape(project.layers[0].id, network);
 
-    // Add rotation animation for demo
+    // Add animation based on template
     const { addAnimation } = useAnimationStore.getState();
     addAnimation(newNetwork.id, {
       property: 'particleSpeed',
       keyframes: [
-        { time: 0, value: 0.2 },
-        { time: 2500, value: 1.0 },
-        { time: 5000, value: 0.2 },
+        { time: 0, value: animationSpeed * 0.5 },
+        { time: 2500, value: animationSpeed * 1.5 },
+        { time: 5000, value: animationSpeed * 0.5 },
       ],
       duration: 5000,
       startTime: 0,
       easing: 'ease-in-out',
     });
-
-    setShowCanvas(true);
   };
 
-  const handleClear = () => {
-    if (project.layers.length === 0) return;
+  const applyTemplate = (templateId: string) => {
+    const template = animationTemplates.find(t => t.id === templateId);
+    if (template) {
+      setNodeCount(template.config.nodeCount);
+      setConnectionDistance(template.config.connectionDistance);
+      setAnimationSpeed(template.config.animationSpeed);
+      setNodeSize(template.config.nodeSize);
+      setColorScheme(template.config.colorScheme);
+      setCurrentTemplate(templateId);
+      
+      // Clear current shapes and create new one
+      const { clearLayer } = useAnimationStore.getState();
+      if (project.layers.length > 0) {
+        clearLayer(project.layers[0].id);
+        setTimeout(() => handleCreateNetwork(), 100);
+      }
+    }
+  };
 
-    const { updateLayer } = useAnimationStore.getState();
-    project.layers.forEach((layer) => {
-      updateLayer(layer.id, { shapes: [] });
-    });
+  const handleStartRecording = () => {
+    setIsRecording(true);
+    // TODO: Implement actual recording logic
+    setTimeout(() => {
+      setIsRecording(false);
+      alert('Recording completed! (Demo)');
+    }, 5000);
   };
 
   return (
-    <div className="flex h-screen bg-gray-900">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-gray-800 bg-gray-950">
-        <div className="border-b border-gray-800 p-4">
-          <h1 className="text-xl font-bold text-white">Flux Studio</h1>
-          <p className="mt-1 text-xs text-gray-500">Animation Creator</p>
+    <div className="flex h-screen bg-black">
+      {/* Canvas Area - Full Width */}
+      <div className="relative flex-1 bg-gray-950">
+        <AnimationCanvas 
+          width={canvasSize.width}
+          height={canvasSize.height}
+          className="max-w-full max-h-full mx-auto" 
+          onCanvasReady={handleCanvasReady} 
+        />
+        
+        {/* Watermark for free version */}
+        <div className="absolute bottom-4 left-4 text-xs text-gray-500 opacity-50">
+          Created with Flux Studio
+        </div>
+      </div>
+
+      {/* Control Panel - Fixed Width */}
+      <div className="w-[350px] overflow-y-auto bg-gray-950 border-l border-gray-800">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <Link 
+              href="/" 
+              className="text-sm text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+            >
+              ← Back to Home
+            </Link>
+            <button className="text-sm text-gray-400 hover:text-white transition-colors">
+              ⚙️ Settings
+            </button>
+          </div>
+          
+          <div className="text-center">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              🎬 Animation Studio
+            </h1>
+            {currentTemplate && (
+              <div className="mt-2 text-sm">
+                <span className="text-gray-400">Template: </span>
+                <span className="text-blue-400 font-medium">
+                  {animationTemplates.find(t => t.id === currentTemplate)?.name}
+                </span>
+              </div>
+            )}
+            <p className="mt-2 text-sm text-gray-400">
+              Create stunning animated visuals and export as GIF or MP4
+            </p>
+          </div>
         </div>
 
-        {/* Tools Section */}
-        <div className="p-4">
-          <h3 className="mb-3 text-xs font-semibold text-gray-500 uppercase">Tools</h3>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                setSelectedTool('circle');
-                handleAddCircle();
-              }}
-              className={`rounded-lg border p-3 transition-all ${
-                selectedTool === 'circle'
-                  ? 'border-blue-500 bg-blue-600 text-white'
-                  : 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
+        {/* Template Quick Selector */}
+        <div className="p-6 border-b border-gray-800">
+          <h3 className="mb-4 text-sm font-semibold text-purple-400 flex items-center gap-2">
+            <span>🎨</span> Quick Templates
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {animationTemplates.slice(0, 4).map((template) => (
+              <button
+                key={template.id}
+                onClick={() => applyTemplate(template.id)}
+                className={`p-3 text-xs rounded-lg transition-all ${
+                  currentTemplate === template.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                {template.thumbnail} {template.name}
+              </button>
+            ))}
+          </div>
+          
+          <div className="text-center">
+            <Link
+              href="/"
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
             >
-              <div className="flex flex-col items-center gap-1">
-                <div className="h-6 w-6 rounded-full bg-current opacity-50"></div>
-                <span className="text-xs">Circle</span>
-              </div>
-            </button>
-            <button
-              onClick={() => {
-                setSelectedTool('network');
-                handleAddNetwork();
-              }}
-              className={`rounded-lg border p-3 transition-all ${
-                selectedTool === 'network'
-                  ? 'border-green-500 bg-green-600 text-white'
-                  : 'border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-700'
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <div className="relative h-6 w-6">
-                  <div className="absolute top-0 left-0 h-2 w-2 rounded-full bg-current"></div>
-                  <div className="absolute top-0 right-0 h-2 w-2 rounded-full bg-current"></div>
-                  <div className="absolute bottom-0 left-2 h-2 w-2 rounded-full bg-current"></div>
-                </div>
-                <span className="text-xs">Network</span>
-              </div>
-            </button>
+              Browse All Templates →
+            </Link>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="mt-6">
-          <div className="px-4">
-            <h3 className="mb-3 text-xs font-semibold text-gray-500 uppercase">Workspace</h3>
-          </div>
-          <div className="space-y-1 px-2">
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-800">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                />
-              </svg>
-              Projects
-            </button>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-800">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"
-                />
-              </svg>
-              Templates
-            </button>
-            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-gray-300 transition-colors hover:bg-gray-800">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              History
-            </button>
-          </div>
-        </nav>
-      </aside>
+        {/* Animation Controls */}
+        <div className="p-6 border-b border-gray-800">
+          <h3 className="mb-4 text-sm font-semibold text-blue-400 flex items-center gap-2">
+            <span>🎨</span> Animation Controls
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Node Count: {nodeCount}
+              </label>
+              <input
+                type="range"
+                min="10"
+                max="200"
+                value={nodeCount}
+                onChange={(e) => setNodeCount(Number(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
 
-      {/* Main Content */}
-      <main className="flex flex-1 flex-col">
-        {/* Toolbar */}
-        <div className="flex h-14 items-center border-b border-gray-800 bg-gray-900 px-4">
-          <div className="flex items-center gap-4">
-            {/* Project Info */}
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-medium text-white">{project.name}</h2>
-              <span className="text-xs text-gray-500">•</span>
-              <span className="text-xs text-gray-400">
-                {project.layers.length} {project.layers.length === 1 ? 'layer' : 'layers'}
-              </span>
-              <span className="text-xs text-gray-500">•</span>
-              <span className="text-xs text-gray-400">
-                {project.layers.reduce((acc, layer) => acc + layer.shapes.length, 0)}{' '}
-                {project.layers.reduce((acc, layer) => acc + layer.shapes.length, 0) === 1
-                  ? 'shape'
-                  : 'shapes'}
-              </span>
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Connection Distance: {connectionDistance}
+              </label>
+              <input
+                type="range"
+                min="50"
+                max="200"
+                value={connectionDistance}
+                onChange={(e) => setConnectionDistance(Number(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Animation Speed: {animationSpeed.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="3.0"
+                step="0.1"
+                value={animationSpeed}
+                onChange={(e) => setAnimationSpeed(Number(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Node Size: {nodeSize}
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="10"
+                value={nodeSize}
+                onChange={(e) => setNodeSize(Number(e.target.value))}
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Color Scheme
+              </label>
+              <select
+                value={colorScheme}
+                onChange={(e) => setColorScheme(e.target.value as any)}
+                className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-gray-600 focus:outline-none text-sm"
+              >
+                <option value="blue">🔵 Blue</option>
+                <option value="purple">🟣 Purple</option>
+                <option value="rainbow">🌈 Rainbow</option>
+                <option value="monochrome">⚫ Monochrome</option>
+                <option value="fire">🔥 Fire</option>
+                <option value="ocean">🌊 Ocean</option>
+              </select>
             </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {/* Action Buttons */}
-            <button
-              onClick={handleClear}
-              className="px-3 py-1.5 text-sm text-gray-400 transition-colors hover:text-white"
-              title="Clear All"
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button 
+              onClick={handleCreateNetwork}
+              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
+              🔄 Regenerate
             </button>
+            <button 
+              onClick={() => applyTemplate('minimal-network')}
+              className="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Minimal
+            </button>
+            <button 
+              onClick={() => applyTemplate('energetic-burst')}
+              className="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Energetic
+            </button>
+            <button 
+              onClick={() => applyTemplate('calm-waves')}
+              className="px-3 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Calm
+            </button>
+          </div>
+        </div>
 
-            <div className="h-6 w-px bg-gray-700" />
+        {/* Template-Specific Tools */}
+        {currentTemplate && (
+          <TemplateToolsPanel 
+            templateId={currentTemplate}
+            selectedTool={selectedTool}
+            onToolSelect={setSelectedTool}
+            toolParameters={toolParameters}
+            onParameterChange={(toolId, paramId, value) => {
+              setToolParameters(prev => ({
+                ...prev,
+                [`${toolId}.${paramId}`]: value
+              }));
+            }}
+          />
+        )}
 
+        {/* Audio Controls (Coming Soon) */}
+        <div className="p-6 border-b border-gray-800 opacity-50">
+          <h3 className="mb-4 text-sm font-semibold text-purple-400 flex items-center gap-2">
+            <span>🔊</span> Audio Controls (Coming Soon)
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Frequency: {frequency} Hz
+              </label>
+              <input
+                type="range"
+                min="100"
+                max="2000"
+                value={frequency}
+                onChange={(e) => setFrequency(Number(e.target.value))}
+                disabled
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-not-allowed opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">
+                Volume: {Math.round(volume * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                disabled
+                className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-not-allowed opacity-50"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Recording Settings */}
+        <div className="p-6 border-b border-gray-800">
+          <h3 className="mb-4 text-sm font-semibold text-green-400 flex items-center gap-2">
+            <span>📹</span> Recording Settings
+          </h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">Canvas Size</label>
+              <select
+                value={`${canvasSize.width}x${canvasSize.height}`}
+                onChange={(e) => {
+                  const [width, height] = e.target.value.split('x').map(Number);
+                  setCanvasSize({ width, height });
+                  setTimeout(() => handleCreateNetwork(), 100);
+                }}
+                className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-gray-600 focus:outline-none mb-4"
+              >
+                <optgroup label="Square (Instagram, TikTok)">
+                  <option value="1080x1080">1080×1080 (Instagram Post)</option>
+                  <option value="1080x1350">1080×1350 (Instagram Portrait)</option>
+                </optgroup>
+                <optgroup label="Vertical (Shorts, Reels, Stories)">
+                  <option value="1080x1920">1080×1920 (Stories/Reels)</option>
+                  <option value="720x1280">720×1280 (TikTok)</option>
+                </optgroup>
+                <optgroup label="Horizontal (YouTube, Twitter)">
+                  <option value="1920x1080">1920×1080 (YouTube HD)</option>
+                  <option value="1280x720">1280×720 (Twitter)</option>
+                  <option value="1200x675">1200×675 (Facebook)</option>
+                </optgroup>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">Output Format</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setExportFormat('gif')}
+                  className={`px-4 py-3 text-sm rounded-lg transition-all ${
+                    exportFormat === 'gif'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  GIF
+                  <div className="text-xs opacity-70">Animated Image</div>
+                </button>
+                <button
+                  onClick={() => setExportFormat('mp4')}
+                  className={`px-4 py-3 text-sm rounded-lg transition-all ${
+                    exportFormat === 'mp4'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  WebM
+                  <div className="text-xs opacity-70">Web Video</div>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">Duration (seconds)</label>
+              <input
+                type="number"
+                defaultValue="5"
+                min="1"
+                max="30"
+                className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-gray-600 focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">Frame Rate</label>
+              <select className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-gray-600 focus:outline-none">
+                <option value="30">30 FPS</option>
+                <option value="60">60 FPS</option>
+                <option value="15">15 FPS</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block mb-2 text-xs text-gray-400">Quality</label>
+              <select className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-gray-600 focus:outline-none">
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+
+          <button
+            onClick={handleStartRecording}
+            disabled={isRecording}
+            className={`mt-6 w-full py-3 px-4 rounded-lg font-medium transition-all ${
+              isRecording
+                ? 'bg-red-600 text-white animate-pulse'
+                : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700'
+            }`}
+          >
+            {isRecording ? (
+              <>🔴 Recording...</>
+            ) : (
+              <>🎬 Start Recording</>
+            )}
+          </button>
+
+          <button className="mt-2 w-full py-3 px-4 rounded-lg font-medium bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all">
+            📥 Download
+          </button>
+        </div>
+
+        {/* Support Section */}
+        <div className="p-6">
+          <div className="text-center">
+            <p className="text-sm text-gray-400 mb-4">Enjoying Flux Studio?</p>
+            <div className="space-y-2">
+              <button className="w-full py-2 px-4 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-medium hover:from-purple-700 hover:to-pink-700 transition-all">
+                💝 Support Us with a Donation
+              </button>
+              <button className="w-full py-2 px-4 rounded-lg bg-gray-800 text-gray-300 text-sm hover:bg-gray-700 transition-all">
+                🎨 Browse Premium Templates
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Stats */}
+        <div className="p-4 border-t border-gray-800 text-center">
+          <div className="text-xs text-gray-500">
+            <div>FPS: {project.fps}</div>
+            <div>Nodes: {nodeCount}</div>
+            <div>Connections: {Math.floor(nodeCount * 0.8)}</div>
+            <div className="mt-2">Status: Ready</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Template Tools Panel Component
+function TemplateToolsPanel({ 
+  templateId, 
+  selectedTool, 
+  onToolSelect, 
+  toolParameters, 
+  onParameterChange 
+}: {
+  templateId: string;
+  selectedTool: string | null;
+  onToolSelect: (toolId: string | null) => void;
+  toolParameters: Record<string, any>;
+  onParameterChange: (toolId: string, paramId: string, value: any) => void;
+}) {
+  const tools = getToolsForTemplate(templateId);
+
+  if (tools.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="p-6 border-b border-gray-800">
+      <h3 className="mb-4 text-sm font-semibold text-yellow-400 flex items-center gap-2">
+        <span>🛠️</span> Template Tools (3D & Effects)
+      </h3>
+      
+      {/* Tool Selection */}
+      <div className="space-y-3 mb-6">
+        {tools.map((tool) => (
+          <div key={tool.id} className="space-y-2">
             <button
-              onClick={() => setShowExportPanel(!showExportPanel)}
-              className={`flex items-center gap-2 rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
-                showExportPanel
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+              onClick={() => onToolSelect(selectedTool === tool.id ? null : tool.id)}
+              className={`w-full p-3 rounded-lg text-left transition-all ${
+                selectedTool === tool.id
+                  ? 'bg-yellow-600 text-white'
                   : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
               }`}
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
-              Export
+              <div className="flex items-center gap-2 mb-1">
+                <span>{tool.icon}</span>
+                <span className="font-medium text-sm">{tool.name}</span>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  tool.category === 'modification' ? 'bg-blue-600' :
+                  tool.category === 'effect' ? 'bg-purple-600' :
+                  tool.category === 'animation' ? 'bg-green-600' :
+                  'bg-gray-600'
+                }`}>
+                  {tool.category}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400">{tool.description}</p>
             </button>
-          </div>
-        </div>
 
-        {/* Canvas Area */}
-        <div className="flex flex-1">
-          {/* Animation Canvas */}
-          <div className="relative flex-1 bg-gray-950">
-            <AnimationCanvas className="h-full w-full" onCanvasReady={handleCanvasReady} />
-
-            {/* Canvas Overlay Info */}
-            {!showCanvas && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="rounded-xl border border-gray-800 bg-gray-900/80 p-8 text-center backdrop-blur-sm">
-                  <div className="mb-4">
-                    <svg
-                      className="mx-auto h-16 w-16 text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
-                      />
-                    </svg>
+            {/* Tool Parameters */}
+            {selectedTool === tool.id && (
+              <div className="ml-4 space-y-3 bg-gray-800/50 p-3 rounded-lg">
+                {tool.parameters.map((param) => (
+                  <div key={param.id}>
+                    <ToolParameter
+                      parameter={param}
+                      value={toolParameters[`${tool.id}.${param.id}`] ?? param.defaultValue}
+                      onChange={(value) => onParameterChange(tool.id, param.id, value)}
+                    />
                   </div>
-                  <p className="mb-2 text-lg font-medium text-white">Ready to Create</p>
-                  <p className="text-sm text-gray-400">
-                    Select a tool from the sidebar to start animating
-                  </p>
+                ))}
+                
+                <div className="flex gap-2 mt-4">
+                  <button className="flex-1 py-2 bg-yellow-600 text-white rounded-lg text-sm font-medium hover:bg-yellow-700 transition-all">
+                    Apply Effect
+                  </button>
+                  <button className="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg text-sm hover:bg-gray-600 transition-all">
+                    Reset
+                  </button>
                 </div>
               </div>
             )}
           </div>
-
-          {/* Properties/Export Panel */}
-          <div className="w-80 border-l border-gray-800 bg-gray-950">
-            {showExportPanel ? (
-              <ExportPanel />
-            ) : (
-              <div className="flex h-full flex-col">
-                <div className="border-b border-gray-800 p-4">
-                  <h2 className="text-sm font-semibold text-white">Properties</h2>
-                </div>
-                <div className="flex-1 p-4">
-                  <div className="py-8 text-center">
-                    <div className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800">
-                      <svg
-                        className="h-6 w-6 text-gray-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-                        />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-400">No element selected</p>
-                    <p className="mt-2 text-xs text-gray-500">
-                      Select a shape to edit its properties
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Timeline */}
-        <Timeline className="h-48" />
-      </main>
+        ))}
+      </div>
     </div>
+  );
+}
+
+// Tool Parameter Component
+function ToolParameter({ parameter, value, onChange }: {
+  parameter: any;
+  value: any;
+  onChange: (value: any) => void;
+}) {
+  switch (parameter.type) {
+    case 'slider':
+      return (
+        <div>
+          <label className="block mb-1 text-xs text-gray-400">
+            {parameter.name}: {value}
+          </label>
+          <input
+            type="range"
+            min={parameter.min}
+            max={parameter.max}
+            step={parameter.step || 1}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+          />
+          <p className="text-xs text-gray-500 mt-1">{parameter.description}</p>
+        </div>
+      );
+
+    case 'select':
+      return (
+        <div>
+          <label className="block mb-1 text-xs text-gray-400">{parameter.name}</label>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-2 py-1 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-gray-500 focus:outline-none"
+          >
+            {parameter.options?.map((option: string) => (
+              <option key={option} value={option}>
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1">{parameter.description}</p>
+        </div>
+      );
+
+    case 'toggle':
+      return (
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-xs text-gray-400">{parameter.name}</label>
+            <p className="text-xs text-gray-500">{parameter.description}</p>
+          </div>
+          <button
+            onClick={() => onChange(!value)}
+            className={`w-10 h-6 rounded-full transition-all ${
+              value ? 'bg-yellow-600' : 'bg-gray-600'
+            }`}
+          >
+            <div className={`w-4 h-4 bg-white rounded-full transition-transform ${
+              value ? 'translate-x-5' : 'translate-x-1'
+            }`} />
+          </button>
+        </div>
+      );
+
+    case 'color':
+      return (
+        <div>
+          <label className="block mb-1 text-xs text-gray-400">{parameter.name}</label>
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full h-8 bg-gray-700 rounded border border-gray-600"
+          />
+          <p className="text-xs text-gray-500 mt-1">{parameter.description}</p>
+        </div>
+      );
+
+    case 'number':
+      return (
+        <div>
+          <label className="block mb-1 text-xs text-gray-400">{parameter.name}</label>
+          <input
+            type="number"
+            min={parameter.min}
+            max={parameter.max}
+            step={parameter.step || 1}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-full px-2 py-1 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-gray-500 focus:outline-none"
+          />
+          <p className="text-xs text-gray-500 mt-1">{parameter.description}</p>
+        </div>
+      );
+
+    default:
+      return (
+        <div>
+          <label className="block mb-1 text-xs text-gray-400">{parameter.name}</label>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-2 py-1 bg-gray-700 text-white rounded text-sm border border-gray-600 focus:border-gray-500 focus:outline-none"
+          />
+          <p className="text-xs text-gray-500 mt-1">{parameter.description}</p>
+        </div>
+      );
+  }
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-black items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    }>
+      <StudioPageContent />
+    </Suspense>
   );
 }

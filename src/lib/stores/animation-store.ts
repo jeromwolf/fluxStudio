@@ -62,6 +62,7 @@ interface AnimationStore {
   addLayer: (name?: string) => AnimationLayer;
   removeLayer: (layerId: string) => void;
   updateLayer: (layerId: string, updates: Partial<AnimationLayer>) => void;
+  clearLayer: (layerId: string) => void;
   reorderLayers: (layerIds: string[]) => void;
 
   // Shape management
@@ -187,6 +188,18 @@ export const useAnimationStore = create<AnimationStore>()(
             layers: state.project.layers.map((layer) =>
               layer.id === layerId ? { ...layer, ...updates } : layer
             ),
+          },
+        }));
+      },
+
+      clearLayer: (layerId) => {
+        set((state) => ({
+          project: {
+            ...state.project,
+            layers: state.project.layers.map((layer) =>
+              layer.id === layerId ? { ...layer, shapes: [] } : layer
+            ),
+            selectedShapeId: null,
           },
         }));
       },

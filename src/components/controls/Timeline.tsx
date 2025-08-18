@@ -236,7 +236,7 @@ export default function Timeline({ className = '' }: TimelineProps) {
 
       {/* Layer Tracks */}
       <div className="max-h-32 overflow-y-auto border-b border-gray-800">
-        {project.layers.map((layer, layerIndex) => (
+        {project.layers.map((layer) => (
           <div key={layer.id} className="flex h-10 border-b border-gray-800">
             {/* Layer Label */}
             <div className="flex w-32 items-center gap-2 border-r border-gray-800 bg-gray-900 px-3">
@@ -246,7 +246,7 @@ export default function Timeline({ className = '' }: TimelineProps) {
 
             {/* Layer Timeline */}
             <div className="relative flex-1 bg-gray-950">
-              {layer.shapes.map((shape, shapeIndex) => (
+              {layer.shapes.map((shape) => (
                 <div key={shape.id} className="absolute top-1.5 h-7">
                   {shape.animations.map((animation) => (
                     <div
