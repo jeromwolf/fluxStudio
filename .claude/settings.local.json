@@ -31,7 +31,12 @@
       "Bash(ffprobe:*)",
       "Bash(open:*)",
       "WebFetch(domain:devcom.kr)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(find:*)",
+      "Bash(npm run:*)",
+      "Bash(touch:*)",
+      "Bash(./scripts/kill-ports.sh:*)",
+      "Bash(./scripts/start-metaverse.sh:*)"
     ],
     "deny": []
   }

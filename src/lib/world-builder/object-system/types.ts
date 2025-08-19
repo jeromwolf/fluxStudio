@@ -1,5 +1,6 @@
 import { ComponentType } from 'react'
 import * as THREE from 'three'
+import type { ColliderShape, PhysicsBody } from '../../physics/physics-system'
 
 // Core object properties that all objects share
 export interface ObjectProperties {
@@ -69,8 +70,31 @@ export interface ObjectInteractions {
   hoverable?: boolean
   draggable?: boolean
   selectable?: boolean
+  physics?: PhysicsInteractions
   onInteract?: (object: WorldObject) => void
   customActions?: CustomAction[]
+}
+
+// Physics interaction definitions
+export interface PhysicsInteractions {
+  enabled?: boolean
+  type?: 'static' | 'dynamic' | 'kinematic'
+  shape?: ColliderShape
+  mass?: number
+  friction?: number
+  restitution?: number
+  density?: number
+  isSensor?: boolean
+  lockRotationX?: boolean
+  lockRotationY?: boolean
+  lockRotationZ?: boolean
+  lockPositionX?: boolean
+  lockPositionY?: boolean
+  lockPositionZ?: boolean
+  onCollisionStart?: (other: WorldObject, impulse?: number) => void
+  onCollisionEnd?: (other: WorldObject) => void
+  onTriggerEnter?: (other: WorldObject) => void
+  onTriggerExit?: (other: WorldObject) => void
 }
 
 // Custom actions for objects
@@ -120,6 +144,7 @@ export interface WorldObject {
   properties: ObjectProperties
   config: ObjectConfig
   mesh?: THREE.Mesh | THREE.Group
+  physicsBody?: PhysicsBody
   state?: Record<string, any>
 }
 

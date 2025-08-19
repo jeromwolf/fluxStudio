@@ -1,215 +1,204 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { animationTemplates, type AnimationTemplate } from '@/lib/templates/animation-templates';
+import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { ArrowRight, Play, Users, Globe, Sparkles, Zap, Star } from 'lucide-react'
+import { useAuth } from '@/core/auth/hooks'
+import { useEffect } from 'react'
 
-export default function Home() {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+export default function LandingPage() {
+  const router = useRouter()
+  const { isAuthenticated, isLoading } = useAuth()
 
-  const categories = [
-    { id: 'all', name: 'All Templates', emoji: '🎯' },
-    { id: 'social', name: 'Social Media', emoji: '📱' },
-    { id: 'presentation', name: 'Presentations', emoji: '📊' },
-    { id: 'web', name: 'Web Design', emoji: '🌐' },
-    { id: 'nft', name: 'NFT & Web3', emoji: '💎' },
-  ];
+  useEffect(() => {
+    // 이미 로그인한 사용자는 대시보드로 리다이렉트
+    if (!isLoading && isAuthenticated) {
+      router.push('/dashboard')
+    }
+  }, [isAuthenticated, isLoading, router])
 
-  const filteredTemplates = selectedCategory === 'all' 
-    ? animationTemplates 
-    : animationTemplates.filter(template => template.category === selectedCategory);
+  const handleGetStarted = () => {
+    router.push('/auth/signin')
+  }
 
-  const freeTemplates = filteredTemplates.filter(t => !t.isPremium);
-  const premiumTemplates = filteredTemplates.filter(t => t.isPremium);
+  const handleExplore = () => {
+    // 게스트 모드로 공개 월드 탐험
+    router.push('/worlds/explore?mode=guest')
+  }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="border-b border-gray-800 bg-black/95 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white overflow-hidden">
+      {/* 배경 애니메이션 */}
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-20 w-72 h-72 bg-purple-500 rounded-full filter blur-3xl opacity-30 animate-pulse" />
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl opacity-30 animate-pulse" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500 rounded-full filter blur-3xl opacity-20 animate-pulse" />
+      </div>
+
+      {/* 헤더 */}
+      <header className="relative z-10 px-4 sm:px-6 lg:px-8 py-6">
+        <nav className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="h-8 w-8 text-purple-400" />
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
               Flux Studio
             </h1>
-            <span className="text-sm text-gray-400">Choose your template</span>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="px-4 py-2 text-sm bg-gray-800 rounded-lg hover:bg-gray-700 transition-all">
-              Sign In
-            </button>
-            <button className="px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all">
-              Go Pro
-            </button>
+          <div className="flex items-center space-x-4">
+            <Button 
+              variant="ghost" 
+              className="text-white hover:text-purple-300"
+              onClick={handleExplore}
+            >
+              둘러보기
+            </Button>
+            <Button 
+              onClick={handleGetStarted}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+            >
+              시작하기
+            </Button>
           </div>
-        </div>
-      </div>
+        </nav>
+      </header>
 
-      {/* Hero Section */}
-      <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Animated Background */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-purple-600/20 to-pink-600/20" />
-          <div className="absolute inset-0 bg-black/50" />
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            Flux Studio
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Create stunning animated visuals with real-time particle effects. 
-            Choose from templates and customize with 3D tools.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link
-              href="/metaverse"
-              className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg font-semibold text-lg hover:from-green-600 hover:to-emerald-700 transition-all transform hover:scale-105 inline-block text-center"
-            >
-              🌐 Enter Metaverse
-            </Link>
-            <Link
-              href="/world-builder"
-              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 inline-block text-center"
-            >
-              🏗️ World Builder
-            </Link>
-            <Link
-              href="/avatar-editor"
-              className="px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg font-semibold text-lg hover:from-purple-600 hover:to-pink-700 transition-all transform hover:scale-105 inline-block text-center"
-            >
-              👤 Avatar Editor
-            </Link>
-            <Link
-              href="/studio"
-              className="px-8 py-4 bg-gray-800 rounded-lg font-semibold text-lg hover:bg-gray-700 transition-all inline-block text-center"
-            >
-              2D Studio
-            </Link>
-          </div>
-
-          <p className="text-sm text-gray-500">
-            No credit card required • Free templates available
-          </p>
-        </div>
-      </div>
-
-      {/* Template Selection */}
-      <div id="templates" className="max-w-7xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Choose Your Template
-          </h2>
-          <p className="text-xl text-gray-400">
-            Each template comes with unique 3D visualization tools
-          </p>
-        </div>
-
-        {/* Category Filter */}
-        <div className="mb-8">
-          <div className="flex flex-wrap gap-2 justify-center">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  selectedCategory === category.id
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                {category.emoji} {category.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Free Templates Section */}
-        {freeTemplates.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              <span className="text-green-500">🆓</span>
-              Free Templates
+      {/* 메인 히어로 섹션 */}
+      <main className="relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="text-center">
+            <h2 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
+              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+                당신만의 메타버스를
+              </span>
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                만들어보세요
+              </span>
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {freeTemplates.map((template) => (
-                <TemplateCard 
-                  key={template.id} 
-                  template={template} 
-                />
-              ))}
+            <p className="text-xl sm:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto">
+              3D 아바타를 만들고, 나만의 월드를 구축하며,<br />
+              친구들과 함께 새로운 경험을 공유하세요
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg"
+                onClick={handleGetStarted}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+              >
+                시작하기
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button 
+                size="lg"
+                variant="outline"
+                onClick={handleExplore}
+                className="text-white border-white/30 hover:bg-white/10 text-lg px-8 py-6"
+              >
+                <Play className="mr-2 h-5 w-5" />
+                둘러보기
+              </Button>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Premium Templates Section */}
-        {premiumTemplates.length > 0 && (
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <span className="text-purple-500">💎</span>
-                Premium Templates
-              </h2>
-              <button className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg text-sm font-medium hover:from-purple-700 hover:to-pink-700 transition-all">
-                Unlock All Premium
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {premiumTemplates.map((template) => (
-                <TemplateCard 
-                  key={template.id} 
-                  template={template} 
-                />
-              ))}
+        {/* 기능 소개 섹션 */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="bg-white/10 backdrop-blur border-white/20 p-6 hover:bg-white/20 transition-colors">
+              <div className="flex items-center justify-center w-12 h-12 bg-purple-500/20 rounded-lg mb-4">
+                <Users className="h-6 w-6 text-purple-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">나만의 아바타</h3>
+              <p className="text-gray-300">
+                다양한 스타일과 액세서리로 나를 표현하는 3D 아바타를 만들어보세요
+              </p>
+            </Card>
+
+            <Card className="bg-white/10 backdrop-blur border-white/20 p-6 hover:bg-white/20 transition-colors">
+              <div className="flex items-center justify-center w-12 h-12 bg-blue-500/20 rounded-lg mb-4">
+                <Globe className="h-6 w-6 text-blue-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">월드 빌더</h3>
+              <p className="text-gray-300">
+                드래그 앤 드롭으로 쉽게 3D 월드를 만들고 친구들과 공유하세요
+              </p>
+            </Card>
+
+            <Card className="bg-white/10 backdrop-blur border-white/20 p-6 hover:bg-white/20 transition-colors">
+              <div className="flex items-center justify-center w-12 h-12 bg-pink-500/20 rounded-lg mb-4">
+                <Zap className="h-6 w-6 text-pink-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">실시간 소통</h3>
+              <p className="text-gray-300">
+                친구들과 함께 월드를 탐험하고 실시간으로 채팅하며 소통하세요
+              </p>
+            </Card>
+          </div>
+        </div>
+
+        {/* 통계 섹션 */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="bg-gradient-to-r from-purple-600/20 to-blue-600/20 backdrop-blur rounded-2xl p-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
+              <div>
+                <div className="text-4xl font-bold mb-2">0+</div>
+                <p className="text-gray-300">활성 사용자</p>
+              </div>
+              <div>
+                <div className="text-4xl font-bold mb-2">0+</div>
+                <p className="text-gray-300">생성된 월드</p>
+              </div>
+              <div>
+                <div className="text-4xl font-bold mb-2">0+</div>
+                <p className="text-gray-300">아바타 생성</p>
+              </div>
+              <div>
+                <div className="text-4xl font-bold mb-2">∞</div>
+                <p className="text-gray-300">가능성</p>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+
+        {/* CTA 섹션 */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+          <h3 className="text-3xl font-bold mb-4">
+            지금 바로 시작하세요
+          </h3>
+          <p className="text-xl text-gray-300 mb-8">
+            무료로 가입하고 메타버스의 세계로 떠나보세요
+          </p>
+          <Button 
+            size="lg"
+            onClick={handleGetStarted}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-lg px-8 py-6"
+          >
+            무료로 시작하기
+            <Star className="ml-2 h-5 w-5" />
+          </Button>
+        </div>
+      </main>
+
+      {/* 푸터 */}
+      <footer className="relative z-10 border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400 text-sm">
+              © 2024 Flux Studio. All rights reserved.
+            </p>
+            <div className="flex items-center space-x-4">
+              <a href="#" className="text-gray-400 hover:text-white text-sm">
+                이용약관
+              </a>
+              <a href="#" className="text-gray-400 hover:text-white text-sm">
+                개인정보처리방침
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
-  );
-}
-
-// Template Card Component
-function TemplateCard({ template }: { template: AnimationTemplate }) {
-  return (
-    <Link 
-      href={`/studio?template=${template.id}`}
-      className="group relative bg-gray-900 rounded-xl overflow-hidden border border-gray-800 hover:border-gray-600 transition-all cursor-pointer transform hover:scale-105 block"
-    >
-      {/* Premium Badge */}
-      {template.isPremium && (
-        <div className="absolute top-2 right-2 z-10 bg-gradient-to-r from-purple-600 to-pink-600 text-xs px-2 py-1 rounded-full font-medium">
-          PRO
-        </div>
-      )}
-
-      {/* Template Preview */}
-      <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-        <span className="text-4xl">{template.thumbnail}</span>
-      </div>
-
-      {/* Template Info */}
-      <div className="p-4">
-        <h3 className="font-semibold text-white mb-1 group-hover:text-blue-400 transition-colors">
-          {template.name}
-        </h3>
-        <p className="text-xs text-gray-400 mb-2">{template.description}</p>
-        
-        {/* Template Settings Preview */}
-        <div className="flex flex-wrap gap-1 text-xs">
-          <span className="bg-gray-800 px-2 py-1 rounded">{template.config.nodeCount} nodes</span>
-          <span className="bg-gray-800 px-2 py-1 rounded">{template.config.animationSpeed}x speed</span>
-        </div>
-      </div>
-
-      {/* Hover Overlay */}
-      <div className="absolute inset-0 bg-blue-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <div className="px-4 py-2 bg-white text-black rounded-lg font-medium transform translate-y-2 group-hover:translate-y-0 transition-transform">
-          Use Template
-        </div>
-      </div>
-    </Link>
-  );
+  )
 }

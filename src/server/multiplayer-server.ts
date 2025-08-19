@@ -14,7 +14,7 @@ interface World {
 }
 
 const worlds = new Map<string, World>()
-const PORT = process.env.MULTIPLAYER_PORT ? parseInt(process.env.MULTIPLAYER_PORT) : 3002
+const PORT = process.env.MULTIPLAYER_PORT ? parseInt(process.env.MULTIPLAYER_PORT) : 3003
 
 const httpServer = createServer()
 const io = new Server(httpServer, {

@@ -1,51 +1,170 @@
 'use client'
 
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Canvas, useThree, ThreeEvent } from '@react-three/fiber'
+import { Canvas, useThree, ThreeEvent, useFrame } from '@react-three/fiber'
 import { OrbitControls, Grid, PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
+THREE.ColorManagement.enabled = true
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ObjectPalette } from './ObjectPalette'
-import { OBJECT_TEMPLATES, ObjectType, createWorldObject } from '@/lib/world-builder/objects'
+import { ObjectType, createWorldObject } from '@/lib/world-builder/objects/index'
 import { ObjectEditor } from './ObjectEditor'
 import { SaveLoadPanel } from '@/components/ui/save-load-panel'
 import { DebugPanel } from './DebugPanel'
 import { WorldStorage, SavedWorld } from '@/lib/storage/world-storage'
-import { Save, FolderOpen, MousePointer2, Hand, PlusCircle, Edit3 } from 'lucide-react'
-import '@/lib/world-builder/initialize'
+import { PhysicsSystem } from '@/lib/physics/physics-system'
+import { PhysicsObjectManager } from '@/lib/world-builder/physics-object-manager'
+import type { WorldObject, PhysicsInteractions, ObjectCategory } from '@/lib/world-builder/object-system/types'
+import { Save, FolderOpen, MousePointer2, Hand, PlusCircle, Edit3, Zap, ZapOff, Play, Pause } from 'lucide-react'
+import { initializeWorldBuilder } from '@/lib/world-builder/initialize'
 
-interface PlacedObject {
-  id: string
-  type: ObjectType
-  mesh: THREE.Mesh | THREE.Group
-  position: THREE.Vector3
-  rotation: THREE.Euler
-  scale: THREE.Vector3
+// Ensure world builder is initialized
+if (typeof window !== 'undefined') {
+  console.log('WorldBuilder: Initializing world builder system')
+  initializeWorldBuilder()
+}
+
+// Convert PlacedObject to WorldObject factory
+function createWorldObjectFromType(type: ObjectType, position: THREE.Vector3): WorldObject {
+  const mesh = createWorldObject(type, position)
+  
+  return {
+    id: `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    metadata: {
+      id: `${type}-${Date.now()}`,
+      type,
+      name: type,
+      category: 'basic' as ObjectCategory,
+      icon: '📦'
+    },
+    properties: {
+      position: position.clone(),
+      rotation: new THREE.Euler(),
+      scale: new THREE.Vector3(1, 1, 1)
+    },
+    config: {
+      interactions: {
+        clickable: true,
+        hoverable: true,
+        draggable: true,
+        selectable: true,
+        physics: {
+          enabled: true,
+          type: 'dynamic',
+          mass: 1,
+          friction: 0.5,
+          restitution: 0.3
+        } as PhysicsInteractions
+      }
+    },
+    mesh
+  }
 }
 
 function BuilderScene({ 
   selectedObject, 
   onPlaceObject,
-  placedObjects,
-  onSelectPlacedObject,
-  selectedPlacedObject,
-  editorMode
+  worldObjects,
+  onSelectWorldObject,
+  selectedWorldObject,
+  editorMode,
+  onUpdateObject,
+  physicsEnabled,
+  onTogglePhysics,
+  onPhysicsManagerReady
 }: { 
   selectedObject: ObjectType | null
-  onPlaceObject: (object: PlacedObject) => void
-  placedObjects: PlacedObject[]
-  onSelectPlacedObject: (object: PlacedObject | null) => void
-  selectedPlacedObject: PlacedObject | null
+  onPlaceObject: (object: WorldObject) => void
+  worldObjects: WorldObject[]
+  onSelectWorldObject: (object: WorldObject | null) => void
+  selectedWorldObject: WorldObject | null
   editorMode: EditorMode
+  onUpdateObject: (id: string, updates: Partial<WorldObject>) => void
+  physicsEnabled: boolean
+  onTogglePhysics: () => void
+  onPhysicsManagerReady?: (manager: PhysicsObjectManager) => void
 }) {
   const { scene, camera } = useThree()
-  const [previewObject, setPreviewObject] = useState<THREE.Mesh | null>(null)
+  const [previewObject, setPreviewObject] = useState<THREE.Mesh | THREE.Group | null>(null)
   const [mousePosition, setMousePosition] = useState(new THREE.Vector3())
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState(new THREE.Vector3())
   const raycaster = useRef(new THREE.Raycaster())
   const plane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
+  
+  // Physics system references
+  const physicsSystemRef = useRef<PhysicsSystem | null>(null)
+  const physicsObjectManagerRef = useRef<PhysicsObjectManager | null>(null)
+  const [physicsInitialized, setPhysicsInitialized] = useState(false)
+
+  // Initialize physics system
+  useEffect(() => {
+    const initPhysics = async () => {
+      try {
+        const physicsSystem = new PhysicsSystem({
+          gravity: new THREE.Vector3(0, -9.81, 0),
+          enableCCD: true
+        })
+        
+        await physicsSystem.initialize()
+        physicsSystemRef.current = physicsSystem
+        
+        const objectManager = new PhysicsObjectManager(physicsSystem)
+        physicsObjectManagerRef.current = objectManager
+        
+        setPhysicsInitialized(true)
+        console.log('🔬 Physics system initialized in WorldBuilder')
+      } catch (error) {
+        console.error('❌ Failed to initialize physics system:', error)
+      }
+    }
+
+    initPhysics()
+
+    return () => {
+      if (physicsSystemRef.current) {
+        physicsSystemRef.current.dispose()
+      }
+    }
+  }, [])
+
+  // Physics simulation loop
+  useFrame((state, deltaTime) => {
+    if (!physicsEnabled || !physicsSystemRef.current || !physicsObjectManagerRef.current) {
+      return
+    }
+
+    // Step physics simulation
+    physicsSystemRef.current.step(deltaTime)
+    
+    // Update all physics objects
+    physicsObjectManagerRef.current.updateAll()
+  })
+
+  // Expose physics manager to parent
+  useEffect(() => {
+    if (physicsObjectManagerRef.current && onPhysicsManagerReady) {
+      onPhysicsManagerReady(physicsObjectManagerRef.current)
+    }
+  }, [physicsObjectManagerRef.current, onPhysicsManagerReady])
+
+  // Add/remove physics when objects change or physics is toggled
+  useEffect(() => {
+    if (!physicsObjectManagerRef.current || !physicsInitialized) return
+
+    if (physicsEnabled) {
+      // Add physics to all objects that support it
+      worldObjects.forEach(obj => {
+        if (obj.config.interactions?.physics?.enabled && !obj.physicsBody) {
+          physicsObjectManagerRef.current!.addPhysicsObject(obj)
+        }
+      })
+    } else {
+      // Remove physics from all objects
+      physicsObjectManagerRef.current.clear()
+    }
+  }, [worldObjects, physicsEnabled, physicsInitialized])
 
   // Handle mouse move for preview and dragging
   const handlePointerMove = useCallback((event: ThreeEvent<PointerEvent>) => {
@@ -60,23 +179,22 @@ function BuilderScene({
     setMousePosition(intersectPoint)
 
     // Handle object dragging in move mode
-    if (editorMode === 'move' && isDragging && selectedPlacedObject) {
+    if (editorMode === 'move' && isDragging && selectedWorldObject) {
       const newPosition = intersectPoint.clone().sub(dragOffset)
-      newPosition.y = selectedPlacedObject.position.y // Keep original height
+      newPosition.y = selectedWorldObject.properties.position.y // Keep original height
       
-      // Update mesh position
-      selectedPlacedObject.mesh.position.copy(newPosition)
+      // Update object position
+      selectedWorldObject.properties.position.copy(newPosition)
+      if (selectedWorldObject.mesh) {
+        selectedWorldObject.mesh.position.copy(newPosition)
+      }
       
-      // Update state to trigger re-render
-      setPlacedObjects(prev => prev.map(obj => {
-        if (obj.id === selectedPlacedObject.id) {
-          return {
-            ...obj,
-            position: newPosition.clone()
-          }
-        }
-        return obj
-      }))
+      // Update physics body if exists
+      if (selectedWorldObject.physicsBody) {
+        physicsObjectManagerRef.current?.updatePhysicsObject(selectedWorldObject)
+      }
+      
+      onUpdateObject(selectedWorldObject.id, selectedWorldObject)
       return
     }
 
@@ -87,17 +205,31 @@ function BuilderScene({
         previewObject.position.y = 0
       } else {
         // Create preview object
-        const template = OBJECT_TEMPLATES.find(t => t.type === selectedObject)
-        if (template) {
-          const preview = createWorldObject(template, intersectPoint)
-          preview.material.opacity = 0.7
-          preview.material.transparent = true
+        console.log('Creating preview for:', selectedObject)
+        console.log('Intersect point:', intersectPoint)
+        try {
+          // Create object directly from type
+          const preview = createWorldObject(selectedObject, intersectPoint)
+          console.log('Preview object created:', preview)
+          console.log('Preview children:', preview.children ? preview.children.length : 0)
+          
+          // Make preview transparent
+          preview.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material) {
+              const material = child.material as THREE.MeshStandardMaterial
+              material.opacity = 0.7
+              material.transparent = true
+            }
+          })
           scene.add(preview)
-          setPreviewObject(preview)
+          setPreviewObject(preview as any)
+          console.log('Preview added to scene')
+        } catch (error) {
+          console.error('Error creating preview:', error)
         }
       }
     }
-  }, [selectedObject, previewObject, camera, scene, editorMode, isDragging, selectedPlacedObject, dragOffset])
+  }, [selectedObject, previewObject, camera, scene, editorMode, isDragging, selectedWorldObject, dragOffset, onUpdateObject])
 
   // Handle mouse down
   const handlePointerDown = useCallback((event: ThreeEvent<PointerEvent>) => {
@@ -105,7 +237,7 @@ function BuilderScene({
     const mouse = event.pointer
     raycaster.current.setFromCamera(mouse, camera)
 
-    const meshes = placedObjects.map(obj => obj.mesh)
+    const meshes = worldObjects.map(obj => obj.mesh).filter(Boolean) as (THREE.Mesh | THREE.Group)[]
     const intersects = raycaster.current.intersectObjects(meshes, true) // true for recursive
     
     if (intersects.length > 0) {
@@ -115,64 +247,46 @@ function BuilderScene({
       while (rootObject.parent && rootObject.parent.type !== 'Scene') {
         rootObject = rootObject.parent
       }
-      const clickedObject = placedObjects.find(obj => obj.mesh === rootObject || obj.mesh === clickedMesh)
+      const clickedObject = worldObjects.find(obj => obj.mesh === rootObject || obj.mesh === clickedMesh)
       
       if (clickedObject) {
-        console.log('Selected object:', {
-          id: clickedObject.id,
-          type: clickedObject.type,
-          meshType: clickedObject.mesh.type,
-          isGroup: clickedObject.mesh instanceof THREE.Group,
-          isMesh: clickedObject.mesh instanceof THREE.Mesh
-        })
-        onSelectPlacedObject(clickedObject)
+        console.log('Selected physics object:', clickedObject.metadata.name)
+        onSelectWorldObject(clickedObject)
         
         // Start dragging in move mode
         if (editorMode === 'move') {
           setIsDragging(true)
           const intersectPoint = intersects[0].point
-          setDragOffset(intersectPoint.clone().sub(clickedObject.position))
+          setDragOffset(intersectPoint.clone().sub(clickedObject.properties.position))
         }
       }
     } else {
       // Click on empty space
       if (editorMode === 'build' && selectedObject && previewObject) {
-        // Place new object
-        const template = OBJECT_TEMPLATES.find(t => t.type === selectedObject)
-        if (!template) return
-
-        const worldObject = createWorldObject(template, previewObject.position.clone())
-        scene.add(worldObject)
-
-        const placedObject: PlacedObject = {
-          id: `${selectedObject}-${Date.now()}`,
-          type: selectedObject,
-          mesh: worldObject,
-          position: worldObject.position.clone(),
-          rotation: worldObject.rotation.clone(),
-          scale: worldObject.scale.clone()
+        // Create new world object with physics support
+        const position = previewObject.position.clone()
+        const worldObject = createWorldObjectFromType(selectedObject, position)
+        
+        scene.add(worldObject.mesh!)
+        onPlaceObject(worldObject)
+        
+        // Add physics if enabled
+        if (physicsEnabled && physicsObjectManagerRef.current) {
+          physicsObjectManagerRef.current.addPhysicsObject(worldObject)
         }
-
-        onPlaceObject(placedObject)
+        
         scene.remove(previewObject)
         setPreviewObject(null)
       } else {
-        onSelectPlacedObject(null)
+        onSelectWorldObject(null)
       }
     }
-  }, [camera, placedObjects, onSelectPlacedObject, editorMode, selectedObject, previewObject, scene, onPlaceObject])
+  }, [camera, worldObjects, onSelectWorldObject, editorMode, selectedObject, previewObject, scene, onPlaceObject, physicsEnabled])
 
   // Handle mouse up
   const handlePointerUp = useCallback(() => {
-    if (isDragging && selectedPlacedObject) {
-      // Finalize position after dragging
-      const updatedObject = placedObjects.find(obj => obj.id === selectedPlacedObject.id)
-      if (updatedObject) {
-        updatedObject.position = updatedObject.mesh.position.clone()
-      }
-    }
     setIsDragging(false)
-  }, [isDragging, selectedPlacedObject, placedObjects])
+  }, [])
 
   // Clean up preview when selection changes
   React.useEffect(() => {
@@ -183,27 +297,26 @@ function BuilderScene({
     }
   }, [selectedObject, previewObject, scene])
 
-  // Make sure all placed objects are in the scene
+  // Make sure all world objects are in the scene
   React.useEffect(() => {
-    placedObjects.forEach(obj => {
+    worldObjects.forEach(obj => {
       if (obj.mesh && !scene.children.includes(obj.mesh)) {
         scene.add(obj.mesh)
       }
     })
 
-    // Cleanup when objects are removed
     return () => {
-      placedObjects.forEach(obj => {
-        if (scene.children.includes(obj.mesh)) {
+      worldObjects.forEach(obj => {
+        if (obj.mesh && scene.children.includes(obj.mesh)) {
           scene.remove(obj.mesh)
         }
       })
     }
-  }, [placedObjects, scene])
+  }, [worldObjects, scene])
 
   // Highlight selected object
   React.useEffect(() => {
-    placedObjects.forEach(obj => {
+    worldObjects.forEach(obj => {
       const updateEmissive = (mesh: THREE.Mesh, selected: boolean) => {
         if (mesh.material && 'emissive' in mesh.material) {
           mesh.material.emissive = new THREE.Color(selected ? 0x444444 : 0x000000)
@@ -211,7 +324,7 @@ function BuilderScene({
         }
       }
 
-      const isSelected = obj.id === selectedPlacedObject?.id
+      const isSelected = obj.id === selectedWorldObject?.id
       
       if (obj.mesh instanceof THREE.Mesh) {
         updateEmissive(obj.mesh, isSelected)
@@ -224,7 +337,77 @@ function BuilderScene({
         })
       }
     })
-  }, [selectedPlacedObject, placedObjects])
+  }, [selectedWorldObject, worldObjects])
+
+  // Create ground plane when physics is enabled
+  useEffect(() => {
+    if (!physicsEnabled || !physicsObjectManagerRef.current || !physicsInitialized) return
+
+    // Check if ground already exists
+    const existingGround = worldObjects.find(obj => obj.id === 'physics-ground')
+    if (existingGround) return
+
+    // Create physics ground
+    const groundMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(100, 0.5, 100),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x606060,
+        transparent: true,
+        opacity: 0.5
+      })
+    )
+    groundMesh.position.y = -0.25
+    groundMesh.receiveShadow = true
+    scene.add(groundMesh)
+
+    const groundObject: WorldObject = {
+      id: 'physics-ground',
+      metadata: {
+        id: 'physics-ground',
+        type: 'ground',
+        name: 'Physics Ground',
+        category: 'basic' as ObjectCategory,
+        icon: '🟫'
+      },
+      properties: {
+        position: groundMesh.position.clone(),
+        rotation: new THREE.Euler(),
+        scale: new THREE.Vector3(1, 1, 1)
+      },
+      config: {
+        interactions: {
+          clickable: false,
+          selectable: false,
+          draggable: false,
+          physics: {
+            enabled: true,
+            type: 'static',
+            shape: { type: 'box', size: new THREE.Vector3(100, 0.5, 100) }
+          } as PhysicsInteractions
+        }
+      },
+      mesh: groundMesh
+    }
+
+    // Add physics to ground
+    physicsObjectManagerRef.current.addPhysicsObject(groundObject)
+    
+    // Don't add to worldObjects to keep it separate from user objects
+    
+    return () => {
+      // Clean up ground when physics is disabled
+      if (groundMesh && scene.children.includes(groundMesh)) {
+        scene.remove(groundMesh)
+        groundMesh.geometry.dispose()
+        if (groundMesh.material instanceof THREE.Material) {
+          groundMesh.material.dispose()
+        }
+      }
+      if (physicsObjectManagerRef.current) {
+        physicsObjectManagerRef.current.removePhysicsObject('physics-ground')
+      }
+    }
+  }, [physicsEnabled, physicsInitialized, scene, worldObjects])
 
   return (
     <>
@@ -262,12 +445,17 @@ type EditorMode = 'build' | 'select' | 'move'
 
 export function WorldBuilder() {
   const [selectedObject, setSelectedObject] = useState<ObjectType | null>(null)
-  const [placedObjects, setPlacedObjects] = useState<PlacedObject[]>([])
+  const [worldObjects, setWorldObjects] = useState<WorldObject[]>([])
   const [editorMode, setEditorMode] = useState<EditorMode>('build')
-  const [selectedPlacedObject, setSelectedPlacedObject] = useState<PlacedObject | null>(null)
+  const [selectedWorldObject, setSelectedWorldObject] = useState<WorldObject | null>(null)
   const [savedWorlds, setSavedWorlds] = useState<SavedWorld[]>([])
   const [showSaveLoad, setShowSaveLoad] = useState(false)
   const [currentWorldId, setCurrentWorldId] = useState<string | null>(null)
+  const [physicsEnabled, setPhysicsEnabled] = useState(false)
+  const [showDebug, setShowDebug] = useState(false)
+  
+  // Physics manager reference for applying forces
+  const physicsManagerRef = useRef<PhysicsObjectManager | null>(null)
 
   useEffect(() => {
     loadWorlds()
@@ -277,14 +465,45 @@ export function WorldBuilder() {
     setSavedWorlds(WorldStorage.getAllWorlds())
   }
 
-  const handlePlaceObject = useCallback((object: PlacedObject) => {
-    setPlacedObjects(prev => [...prev, object])
+  const handlePlaceObject = useCallback((object: WorldObject) => {
+    setWorldObjects(prev => [...prev, object])
+    console.log(`Placed object: ${object.metadata.name}`)
+  }, [])
+
+  const handleUpdateObject = useCallback((id: string, updates: Partial<WorldObject>) => {
+    setWorldObjects(prev => prev.map(obj => 
+      obj.id === id ? { ...obj, ...updates } : obj
+    ))
+  }, [])
+
+  const handleDeleteSelectedObject = useCallback(() => {
+    if (selectedWorldObject) {
+      setWorldObjects(prev => prev.filter(obj => obj.id !== selectedWorldObject.id))
+      setSelectedWorldObject(null)
+    }
+  }, [selectedWorldObject])
+
+  const handleTogglePhysics = useCallback(() => {
+    setPhysicsEnabled(prev => !prev)
+    console.log(`Physics ${!physicsEnabled ? 'enabled' : 'disabled'}`)
+  }, [physicsEnabled])
+
+  const handleApplyForce = useCallback((objectId: string, force: THREE.Vector3) => {
+    if (physicsManagerRef.current) {
+      physicsManagerRef.current.applyForce(objectId, force)
+    }
+  }, [])
+
+  const handleApplyImpulse = useCallback((objectId: string, impulse: THREE.Vector3) => {
+    if (physicsManagerRef.current) {
+      physicsManagerRef.current.applyImpulse(objectId, impulse)
+    }
   }, [])
 
   const handleClearAll = () => {
     if (!confirm('Clear all objects? This cannot be undone.')) return
     
-    placedObjects.forEach(obj => {
+    worldObjects.forEach(obj => {
       if (obj.mesh instanceof THREE.Mesh) {
         obj.mesh.geometry.dispose()
         if (obj.mesh.material instanceof THREE.Material) {
@@ -305,14 +524,34 @@ export function WorldBuilder() {
         })
       }
     })
-    setPlacedObjects([])
-    setSelectedPlacedObject(null)
+    setWorldObjects([])
+    setSelectedWorldObject(null)
     setCurrentWorldId(null)
   }
 
   const handleSaveWorld = (name: string) => {
-    const worldObjects = WorldStorage.createWorldFromScene(placedObjects)
-    const world = WorldStorage.saveWorld(name, worldObjects, {}, `A world with ${placedObjects.length} objects`)
+    // Convert WorldObjects to legacy format for storage compatibility
+    const legacyObjects = worldObjects.map(obj => ({
+      id: obj.id,
+      type: obj.metadata.type,
+      position: { 
+        x: obj.properties.position.x, 
+        y: obj.properties.position.y, 
+        z: obj.properties.position.z 
+      },
+      rotation: { 
+        x: obj.properties.rotation.x, 
+        y: obj.properties.rotation.y, 
+        z: obj.properties.rotation.z 
+      },
+      scale: { 
+        x: obj.properties.scale.x, 
+        y: obj.properties.scale.y, 
+        z: obj.properties.scale.z 
+      }
+    }))
+    
+    const world = WorldStorage.saveWorld(name, legacyObjects, {}, `A physics world with ${worldObjects.length} objects`)
     if (world) {
       setCurrentWorldId(world.id)
       loadWorlds()
@@ -328,10 +567,7 @@ export function WorldBuilder() {
 
     // Load objects from saved world
     const newObjects: PlacedObject[] = world.objects.map(obj => {
-      const template = OBJECT_TEMPLATES.find(t => t.type === obj.type)
-      if (!template) return null
-
-      const mesh = createWorldObject(template, new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z))
+      const mesh = createWorldObject(obj.type, new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z))
       mesh.rotation.set(obj.rotation.x, obj.rotation.y, obj.rotation.z)
       mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z)
       
@@ -388,46 +624,6 @@ export function WorldBuilder() {
     }
   }
 
-  const handleUpdateObject = (updates: Partial<{
-    position: THREE.Vector3
-    rotation: THREE.Euler
-    scale: THREE.Vector3
-    color: string
-  }>) => {
-    if (!selectedPlacedObject) return
-
-    setPlacedObjects(prev => prev.map(obj => {
-      if (obj.id === selectedPlacedObject.id) {
-        if (updates.position) {
-          obj.mesh.position.copy(updates.position)
-          obj.position = updates.position.clone()
-        }
-        if (updates.rotation) {
-          obj.mesh.rotation.copy(updates.rotation)
-          obj.rotation = updates.rotation.clone()
-        }
-        if (updates.scale) {
-          obj.mesh.scale.copy(updates.scale)
-          obj.scale = updates.scale.clone()
-        }
-        if (updates.color) {
-          if (obj.mesh instanceof THREE.Mesh && obj.mesh.material && 'color' in obj.mesh.material) {
-            obj.mesh.material.color = new THREE.Color(updates.color)
-          } else if (obj.mesh instanceof THREE.Group) {
-            // Update color for all mesh children in the group
-            obj.mesh.traverse((child) => {
-              if (child instanceof THREE.Mesh && child.material && 'color' in child.material) {
-                child.material.color = new THREE.Color(updates.color)
-              }
-            })
-          }
-        }
-        return { ...obj }
-      }
-      return obj
-    }))
-  }
-
   const handleDeleteObject = () => {
     if (!selectedPlacedObject) return
 
@@ -459,180 +655,146 @@ export function WorldBuilder() {
   }
 
   return (
-    <div className={cn(
-      "relative w-full h-screen",
-      editorMode === 'move' && "cursor-move",
-      editorMode === 'select' && "cursor-pointer",
-      editorMode === 'build' && selectedObject && "cursor-crosshair"
-    )}>
-      <Canvas shadows camera={{ position: [10, 10, 10], fov: 60 }}>
-        <BuilderScene 
-          selectedObject={editorMode === 'build' ? selectedObject : null} 
-          onPlaceObject={handlePlaceObject}
-          placedObjects={placedObjects}
-          onSelectPlacedObject={setSelectedPlacedObject}
-          selectedPlacedObject={selectedPlacedObject}
-          editorMode={editorMode}
-        />
-        <OrbitControls 
-          enablePan={true}
-          minDistance={5}
-          maxDistance={100}
-          maxPolarAngle={Math.PI / 2.1}
-        />
-      </Canvas>
-
-      {/* UI Overlay */}
-      <div className="absolute top-4 left-4">
-        {editorMode === 'build' && (
-          <ObjectPalette 
-            selectedObject={selectedObject}
-            onSelectObject={setSelectedObject}
-          />
-        )}
-        {editorMode !== 'build' && (
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4">
-            <p className="text-sm text-gray-600">
-              Mode: <span className="font-semibold capitalize">{editorMode}</span>
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Controls */}
-      <div className="absolute top-4 right-4 space-y-4">
-        <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-4">
-          <h3 className="text-lg font-semibold mb-3">Editor Mode</h3>
-          
-          {/* Mode Selection */}
-          <div className="grid grid-cols-3 gap-1 mb-4 p-1 bg-gray-100 rounded-lg">
+    <div className="h-screen flex">
+      {/* Left sidebar */}
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        {/* Mode selector */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex gap-2 mb-4">
             <Button
-              variant={editorMode === 'build' ? "default" : "ghost"}
+              variant={editorMode === 'select' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => {
-                setEditorMode('build')
-                setSelectedPlacedObject(null)
-              }}
-              className="flex flex-col items-center py-2"
+              onClick={() => setEditorMode('select')}
+              className="flex items-center gap-2"
             >
-              <PlusCircle className="w-4 h-4 mb-1" />
-              <span className="text-xs">Build</span>
+              <MousePointer2 className="w-4 h-4" />
+              선택
             </Button>
             <Button
-              variant={editorMode === 'select' ? "default" : "ghost"}
+              variant={editorMode === 'build' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => {
-                setEditorMode('select')
-                setSelectedObject(null)
-              }}
-              className="flex flex-col items-center py-2"
+              onClick={() => setEditorMode('build')}
+              className="flex items-center gap-2"
             >
-              <MousePointer2 className="w-4 h-4 mb-1" />
-              <span className="text-xs">Select</span>
+              <PlusCircle className="w-4 h-4" />
+              배치
             </Button>
             <Button
-              variant={editorMode === 'move' ? "default" : "ghost"}
+              variant={editorMode === 'move' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => {
-                setEditorMode('move')
-                setSelectedObject(null)
-              }}
-              className="flex flex-col items-center py-2"
+              onClick={() => setEditorMode('move')}
+              className="flex items-center gap-2"
             >
-              <Hand className="w-4 h-4 mb-1" />
-              <span className="text-xs">Move</span>
+              <Hand className="w-4 h-4" />
+              이동
             </Button>
           </div>
-          
-          <div className="space-y-2 mb-4">
-            
+
+          {/* Physics controls */}
+          <div className="flex gap-2">
+            <Button
+              variant={physicsEnabled ? 'default' : 'outline'}
+              size="sm"
+              onClick={handleTogglePhysics}
+              className="flex items-center gap-2"
+            >
+              {physicsEnabled ? (
+                <>
+                  <Zap className="w-4 h-4" />
+                  물리 ON
+                </>
+              ) : (
+                <>
+                  <ZapOff className="w-4 h-4" />
+                  물리 OFF
+                </>
+              )}
+            </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowSaveLoad(!showSaveLoad)}
-              className="w-full"
+              onClick={() => setShowDebug(!showDebug)}
+              className="flex items-center gap-2"
             >
-              <Save className="w-4 h-4 mr-1" />
-              Save/Load Worlds
+              <Edit3 className="w-4 h-4" />
+              디버그
             </Button>
-            
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleClearAll}
-              className="w-full"
-            >
-              Clear All Objects
-            </Button>
-          </div>
-          
-          <div className="text-sm text-gray-600">
-            <p>Objects placed: {placedObjects.length}</p>
-            {currentWorldId && <p className="text-xs">World ID: {currentWorldId.slice(0, 8)}...</p>}
-          </div>
-          
-          {/* Mode Instructions */}
-          <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
-            {editorMode === 'build' && (
-              <p className="text-blue-700">
-                <PlusCircle className="w-3 h-3 inline mr-1" />
-                Select an object from the palette and click to place
-              </p>
-            )}
-            {editorMode === 'select' && (
-              <p className="text-blue-700">
-                <MousePointer2 className="w-3 h-3 inline mr-1" />
-                Click on objects to select and edit properties
-              </p>
-            )}
-            {editorMode === 'move' && (
-              <p className="text-blue-700">
-                <Hand className="w-3 h-3 inline mr-1" />
-                Click and drag objects to move them
-              </p>
-            )}
           </div>
         </div>
 
-        {/* Object Editor */}
-        {selectedPlacedObject && (
-          <ObjectEditor
-            selectedObject={selectedPlacedObject}
-            onUpdateObject={handleUpdateObject}
-            onDeleteObject={handleDeleteObject}
-          />
+        {/* Object palette */}
+        {editorMode === 'build' && (
+          <div className="flex-1 overflow-hidden">
+            <ObjectPalette
+              selectedObject={selectedObject}
+              onSelectObject={setSelectedObject}
+            />
+          </div>
         )}
-        
-        {/* Debug Panel */}
-        <DebugPanel
-          selectedObject={selectedPlacedObject}
-          placedObjects={placedObjects}
-          className="mt-4"
-        />
+
+        {/* Object editor */}
+        {selectedWorldObject && (
+          <div className="flex-1 overflow-hidden">
+            <ObjectEditor
+              object={selectedWorldObject}
+              onUpdate={handleUpdateObject}
+              onDelete={handleDeleteSelectedObject}
+              physicsEnabled={physicsEnabled}
+              onApplyForce={handleApplyForce}
+              onApplyImpulse={handleApplyImpulse}
+            />
+          </div>
+        )}
+
+        {/* Debug panel */}
+        {showDebug && (
+          <div className="border-t border-gray-200 p-4">
+            <DebugPanel 
+              objectCount={worldObjects.length}
+              physicsObjectCount={worldObjects.filter(obj => obj.physicsBody).length}
+              physicsEnabled={physicsEnabled}
+              selectedObject={selectedWorldObject}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Save/Load Panel */}
-      {showSaveLoad && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-          <SaveLoadPanel
-            type="world"
-            items={savedWorlds}
-            onSave={handleSaveWorld}
-            onLoad={handleLoadWorld}
-            onExport={handleExportWorld}
-            onImport={handleImportWorld}
-            onDelete={(id) => {
-              if (WorldStorage.deleteWorld(id)) {
-                loadWorlds()
-                if (currentWorldId === id) {
-                  setCurrentWorldId(null)
-                }
-              }
+      {/* Main canvas */}
+      <div className="flex-1">
+        <Canvas 
+          shadows
+          camera={{ position: [10, 10, 10], fov: 50 }}
+          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        >
+          <color attach="background" args={['#f3f4f6']} />
+          <fog attach="fog" args={['#f3f4f6', 50, 200]} />
+          
+          <BuilderScene
+            selectedObject={selectedObject}
+            onPlaceObject={handlePlaceObject}
+            worldObjects={worldObjects}
+            onSelectWorldObject={setSelectedWorldObject}
+            selectedWorldObject={selectedWorldObject}
+            editorMode={editorMode}
+            onUpdateObject={handleUpdateObject}
+            physicsEnabled={physicsEnabled}
+            onTogglePhysics={handleTogglePhysics}
+            onPhysicsManagerReady={(manager) => {
+              physicsManagerRef.current = manager
             }}
-            className="w-96"
           />
-        </div>
-      )}
+          
+          <PerspectiveCamera makeDefault position={[10, 10, 10]} />
+          <OrbitControls 
+            enablePan={true} 
+            enableZoom={true} 
+            enableRotate={true}
+            minDistance={5}
+            maxDistance={100}
+            maxPolarAngle={Math.PI / 2}
+          />
+        </Canvas>
+      </div>
     </div>
   )
 }
