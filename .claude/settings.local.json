@@ -36,7 +36,8 @@
       "Bash(npm run:*)",
       "Bash(touch:*)",
       "Bash(./scripts/kill-ports.sh:*)",
-      "Bash(./scripts/start-metaverse.sh:*)"
+      "Bash(./scripts/start-metaverse.sh:*)",
+      "Bash(git restore:*)"
     ],
     "deny": []
   }

@@ -1,75 +1,76 @@
-'use client'
+'use client';
 
-import { use, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useWorldStore } from '@/shared/stores/world-store'
-import { useAvatarStore } from '@/shared/stores/avatar-store'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { ChevronLeft, Edit3, Users, MessageSquare, Volume2, VolumeX, Settings } from 'lucide-react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Grid, PerspectiveCamera, Sky } from '@react-three/drei'
-import * as THREE from 'three'
+import { OrbitControls, Grid, PerspectiveCamera, Sky } from '@react-three/drei';
+import { Canvas } from '@react-three/fiber';
+import { ChevronLeft, Edit3, Users, MessageSquare, Volume2, VolumeX, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { use, useEffect, useState } from 'react';
+import * as THREE from 'three';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useAvatarStore } from '@/shared/stores/avatar-store';
+import { useWorldStore } from '@/shared/stores/world-store';
 
 export default function PlayWorldPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const router = useRouter()
-  const [world, setWorld] = useState<any>(null)
-  const [showChat, setShowChat] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  
-  const savedWorlds = useWorldStore((state) => state.savedWorlds)
-  const currentAvatar = useAvatarStore((state) => state.currentAvatar)
-  
+  const { id } = use(params);
+  const router = useRouter();
+  const [world, setWorld] = useState<any>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const savedWorlds = useWorldStore((state) => state.savedWorlds);
+  const currentAvatar = useAvatarStore((state) => state.currentAvatar);
+
   useEffect(() => {
-    const foundWorld = savedWorlds.find(w => w.id === id)
+    const foundWorld = savedWorlds.find((w) => w.id === id);
     if (foundWorld) {
-      setWorld(foundWorld)
+      setWorld(foundWorld);
     } else {
-      router.push('/worlds')
+      router.push('/worlds');
     }
-  }, [id, savedWorlds, router])
+  }, [id, savedWorlds, router]);
 
   const handleEditWorld = () => {
-    router.push(`/worlds/${id}/edit`)
-  }
+    router.push(`/worlds/${id}/edit`);
+  };
 
   const handleLeaveWorld = () => {
-    router.push('/worlds')
-  }
+    router.push('/worlds');
+  };
 
   if (!world) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto"></div>
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-t-2 border-b-2 border-purple-500"></div>
           <p className="mt-4 text-gray-600">월드 로딩 중...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-900">
+    <div className="flex h-screen flex-col bg-gray-900">
       {/* Header */}
-      <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between z-10">
+      <div className="z-10 flex items-center justify-between bg-gray-800 px-4 py-2 text-white">
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={handleLeaveWorld}
             className="text-white hover:text-gray-300"
           >
-            <ChevronLeft className="h-4 w-4 mr-1" />
+            <ChevronLeft className="mr-1 h-4 w-4" />
             나가기
           </Button>
           <h1 className="text-lg font-semibold">{world.name}</h1>
           <div className="flex items-center text-sm text-gray-400">
-            <Users className="h-4 w-4 mr-1" />
+            <Users className="mr-1 h-4 w-4" />
             <span>1/{world.maxPlayers}</span>
           </div>
         </div>
-        
+
         <div className="flex items-center space-x-2">
           <Button
             variant="ghost"
@@ -97,37 +98,34 @@ export default function PlayWorldPage({ params }: { params: Promise<{ id: string
               <Edit3 className="h-5 w-5" />
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white hover:text-gray-300"
-          >
+          <Button variant="ghost" size="icon" className="text-white hover:text-gray-300">
             <Settings className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 relative">
+      <div className="relative flex-1">
         {/* 3D World View */}
         <Canvas shadows>
           <PerspectiveCamera makeDefault position={[10, 10, 10]} />
           <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
-          
+
           <Sky sunPosition={[100, 20, 100]} />
           <ambientLight intensity={0.5} />
           <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
-          
+
           <Grid args={[100, 100]} />
-          
+
           {/* Render world objects */}
-          {world.objects && world.objects.map((obj: any, index: number) => (
-            <mesh key={index} position={[obj.position.x, obj.position.y, obj.position.z]}>
-              <boxGeometry args={[1, 1, 1]} />
-              <meshStandardMaterial color={obj.color || '#888888'} />
-            </mesh>
-          ))}
-          
+          {world.objects &&
+            world.objects.map((obj: any, index: number) => (
+              <mesh key={index} position={[obj.position.x, obj.position.y, obj.position.z]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial color={obj.color || '#888888'} />
+              </mesh>
+            ))}
+
           {/* Player Avatar */}
           <mesh position={[0, 1, 0]}>
             <capsuleGeometry args={[0.5, 1.5]} />
@@ -137,19 +135,17 @@ export default function PlayWorldPage({ params }: { params: Promise<{ id: string
 
         {/* Chat Panel */}
         {showChat && (
-          <Card className="absolute bottom-4 left-4 w-80 h-96 bg-white/90 backdrop-blur">
-            <div className="p-4 h-full flex flex-col">
-              <h3 className="font-semibold mb-2">채팅</h3>
-              <div className="flex-1 overflow-y-auto mb-2 p-2 bg-gray-50 rounded">
-                <p className="text-sm text-gray-500 text-center">
-                  채팅 메시지가 없습니다
-                </p>
+          <Card className="absolute bottom-4 left-4 h-96 w-80 bg-white/90 backdrop-blur">
+            <div className="flex h-full flex-col p-4">
+              <h3 className="mb-2 font-semibold">채팅</h3>
+              <div className="mb-2 flex-1 overflow-y-auto rounded bg-gray-50 p-2">
+                <p className="text-center text-sm text-gray-500">채팅 메시지가 없습니다</p>
               </div>
               <div className="flex space-x-2">
                 <input
                   type="text"
                   placeholder="메시지 입력..."
-                  className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 rounded-lg border px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:outline-none"
                 />
                 <Button size="sm">전송</Button>
               </div>
@@ -158,13 +154,13 @@ export default function PlayWorldPage({ params }: { params: Promise<{ id: string
         )}
 
         {/* Controls Help */}
-        <div className="absolute bottom-4 right-4 bg-black/50 text-white p-3 rounded-lg text-sm">
-          <p className="font-semibold mb-1">조작법</p>
+        <div className="absolute right-4 bottom-4 rounded-lg bg-black/50 p-3 text-sm text-white">
+          <p className="mb-1 font-semibold">조작법</p>
           <p>이동: WASD</p>
           <p>시점: 마우스</p>
           <p>점프: Space</p>
         </div>
       </div>
     </div>
-  )
+  );
 }

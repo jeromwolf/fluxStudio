@@ -1,66 +1,64 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useWorldStore } from '@/shared/stores/world-store'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { ChevronLeft, ChevronRight, Globe, Lock, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Globe, Lock, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import { useWorldStore } from '@/shared/stores/world-store';
 
 export default function CreateWorldPage() {
-  const router = useRouter()
-  const createWorld = useWorldStore((state) => state.createWorld)
-  
+  const router = useRouter();
+  const createWorld = useWorldStore((state) => state.createWorld);
+
   const [worldData, setWorldData] = useState({
     name: '',
     description: '',
     visibility: 'public' as 'public' | 'private' | 'friends',
-    maxPlayers: 50
-  })
+    maxPlayers: 50,
+  });
 
   const handleCreate = () => {
-    console.log('Create world clicked', worldData)
-    
+    console.log('Create world clicked', worldData);
+
     if (!worldData.name.trim()) {
-      alert('월드 이름을 입력해주세요')
-      return
+      alert('월드 이름을 입력해주세요');
+      return;
     }
 
     const newWorld = createWorld({
       name: worldData.name,
       description: worldData.description,
       visibility: worldData.visibility,
-      maxPlayers: worldData.maxPlayers
-    })
+      maxPlayers: worldData.maxPlayers,
+    });
 
-    console.log('New world created:', newWorld)
+    console.log('New world created:', newWorld);
 
     if (newWorld) {
       // Navigate to world builder
-      const editPath = `/worlds/${newWorld.id}/edit`
-      console.log('Navigating to:', editPath)
-      router.push(editPath)
+      const editPath = `/my-worlds/${newWorld.id}/edit`;
+      console.log('Navigating to:', editPath);
+      router.push(editPath);
     } else {
-      console.error('Failed to create world')
+      console.error('Failed to create world');
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
       {/* Header */}
-      <div className="bg-white shadow-sm mb-8">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="mb-8 bg-white shadow-sm">
+        <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => router.push('/worlds')}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
+              <Button variant="ghost" onClick={() => router.push('/my-worlds')}>
+                <ChevronLeft className="mr-1 h-4 w-4" />
                 뒤로
               </Button>
               <h1 className="text-2xl font-bold">새 월드 만들기</h1>
@@ -69,7 +67,7 @@ export default function CreateWorldPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+      <div className="mx-auto max-w-4xl px-4 pb-8 sm:px-6 lg:px-8">
         <Card>
           <CardHeader>
             <CardTitle>월드 정보 입력</CardTitle>
@@ -109,32 +107,32 @@ export default function CreateWorldPage() {
                 onValueChange={(value: any) => setWorldData({ ...worldData, visibility: value })}
                 className="mt-2 space-y-2"
               >
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+                <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-gray-50">
                   <RadioGroupItem value="public" id="public" />
-                  <Label htmlFor="public" className="flex items-center cursor-pointer flex-1">
-                    <Globe className="h-4 w-4 mr-2 text-green-600" />
+                  <Label htmlFor="public" className="flex flex-1 cursor-pointer items-center">
+                    <Globe className="mr-2 h-4 w-4 text-green-600" />
                     <div>
                       <p className="font-medium">공개</p>
                       <p className="text-sm text-gray-600">누구나 방문할 수 있습니다</p>
                     </div>
                   </Label>
                 </div>
-                
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+
+                <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-gray-50">
                   <RadioGroupItem value="friends" id="friends" />
-                  <Label htmlFor="friends" className="flex items-center cursor-pointer flex-1">
-                    <Users className="h-4 w-4 mr-2 text-blue-600" />
+                  <Label htmlFor="friends" className="flex flex-1 cursor-pointer items-center">
+                    <Users className="mr-2 h-4 w-4 text-blue-600" />
                     <div>
                       <p className="font-medium">친구 공개</p>
                       <p className="text-sm text-gray-600">친구만 방문할 수 있습니다</p>
                     </div>
                   </Label>
                 </div>
-                
-                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+
+                <div className="flex items-center space-x-2 rounded-lg border p-3 hover:bg-gray-50">
                   <RadioGroupItem value="private" id="private" />
-                  <Label htmlFor="private" className="flex items-center cursor-pointer flex-1">
-                    <Lock className="h-4 w-4 mr-2 text-gray-600" />
+                  <Label htmlFor="private" className="flex flex-1 cursor-pointer items-center">
+                    <Lock className="mr-2 h-4 w-4 text-gray-600" />
                     <div>
                       <p className="font-medium">비공개</p>
                       <p className="text-sm text-gray-600">나만 입장할 수 있습니다</p>
@@ -153,20 +151,19 @@ export default function CreateWorldPage() {
                 min="1"
                 max="100"
                 value={worldData.maxPlayers}
-                onChange={(e) => setWorldData({ ...worldData, maxPlayers: parseInt(e.target.value) || 50 })}
+                onChange={(e) =>
+                  setWorldData({ ...worldData, maxPlayers: parseInt(e.target.value) || 50 })
+                }
                 className="mt-1"
               />
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="mt-1 text-sm text-gray-600">
                 동시에 접속할 수 있는 최대 인원 (1-100명)
               </p>
             </div>
 
             {/* Action Buttons */}
             <div className="flex justify-end space-x-4 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/worlds')}
-              >
+              <Button variant="outline" onClick={() => router.push('/my-worlds')}>
                 취소
               </Button>
               <Button
@@ -175,12 +172,12 @@ export default function CreateWorldPage() {
                 className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
               >
                 월드 만들기
-                <ChevronRight className="h-4 w-4 ml-2" />
+                <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
